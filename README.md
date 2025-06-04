@@ -323,7 +323,7 @@ composer test
 
 ## Security
 
-If you discover any security related issues, please email ronydebnath@gmail.com instead of using the issue tracker.
+If you discover any security related issues, please email hello[at]ronydebnath.com instead of using the issue tracker.
 
 ## License
 
