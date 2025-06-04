@@ -3,6 +3,10 @@
 namespace Ronydebnath\MCP\Tests\Client;
 
 use PHPUnit\Framework\TestCase;
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 use Ronydebnath\MCP\Client\MCPClient;
 use Ronydebnath\MCP\Types\Message;
 use Ronydebnath\MCP\Types\Role;
@@ -10,56 +14,64 @@ use Ronydebnath\MCP\Types\MessageType;
 
 class MCPClientTest extends TestCase
 {
-    private MCPClient $client;
+    protected MCPClient $client;
+    protected MockHandler $mock;
+    protected Client $httpClient;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->client = new MCPClient([
-            'host' => 'localhost',
-            'port' => 8000,
-            'timeout' => 30,
-        ]);
+        $this->mock = new MockHandler();
+        $handlerStack = HandlerStack::create($this->mock);
+        $this->httpClient = new Client(['handler' => $handlerStack]);
+        $this->client = new MCPClient('http://localhost:8000', $this->httpClient);
     }
 
     public function test_can_send_message()
     {
+        $this->mock->append(new Response(200, [], json_encode([
+            'role' => 'assistant',
+            'content' => 'Hi there!',
+            'type' => 'text'
+        ])));
+
         $message = new Message(
+            content: 'Hello',
             role: Role::USER,
-            content: 'Hello, MCP!',
             type: MessageType::TEXT
         );
 
-        $response = $this->client->send($message);
-
-        $this->assertIsArray($response);
-        $this->assertArrayHasKey('role', $response);
-        $this->assertArrayHasKey('content', $response);
-        $this->assertArrayHasKey('type', $response);
+        $response = $this->client->sendMessage($message);
         $this->assertEquals('assistant', $response['role']);
+        $this->assertEquals('Hi there!', $response['content']);
+        $this->assertEquals('text', $response['type']);
     }
 
     public function test_can_send_multiple_messages()
     {
+        $this->mock->append(new Response(200, [], json_encode([
+            'role' => 'assistant',
+            'content' => 'Hi there!',
+            'type' => 'text'
+        ])));
+
         $messages = [
             new Message(
+                content: 'Hello',
                 role: Role::USER,
-                content: 'Hello, MCP!',
                 type: MessageType::TEXT
             ),
             new Message(
-                role: Role::ASSISTANT,
-                content: 'Hi there!',
+                content: 'How are you?',
+                role: Role::USER,
                 type: MessageType::TEXT
-            ),
+            )
         ];
 
-        $response = $this->client->sendMultiple($messages);
-
-        $this->assertIsArray($response);
-        $this->assertArrayHasKey('role', $response);
-        $this->assertArrayHasKey('content', $response);
-        $this->assertArrayHasKey('type', $response);
+        $response = $this->client->sendMessages($messages);
+        $this->assertEquals('assistant', $response['role']);
+        $this->assertEquals('Hi there!', $response['content']);
+        $this->assertEquals('text', $response['type']);
     }
 
     public function test_handles_connection_error()

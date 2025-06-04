@@ -9,16 +9,22 @@ use Ronydebnath\MCP\Types\Message;
 use Ronydebnath\MCP\Types\Role;
 use Ronydebnath\MCP\Types\MessageType;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Ronydebnath\MCP\Server\Auth\AuthProvider;
+use Ronydebnath\MCP\Server\Auth\AuthenticationException;
 
 class MCPServer
 {
     private array $sessions = [];
     private array $handlers = [];
     private array $middleware = [];
+    protected ?AuthProvider $authProvider = null;
 
     public function __construct(
-        private readonly array $config = []
-    ) {}
+        private readonly array $config = [],
+        ?AuthProvider $authProvider = null
+    ) {
+        $this->authProvider = $authProvider;
+    }
 
     /**
      * Register a message handler
@@ -51,24 +57,61 @@ class MCPServer
      */
     public function handle(Request $request): Response|StreamedResponse
     {
-        // Apply middleware
-        foreach ($this->middleware as $middleware) {
-            $response = $middleware($request);
-            if ($response instanceof Response) {
-                return $response;
+        try {
+            // Run middleware
+            foreach ($this->middleware as $middleware) {
+                $response = $middleware($request);
+                if ($response instanceof Response) {
+                    return $response;
+                }
             }
-        }
 
-        // Check if this is a streaming request
-        if ($request->header('Accept') === 'text/event-stream') {
-            return $this->handleStreamingRequest($request);
-        }
+            // Authenticate if provider is set
+            if ($this->authProvider) {
+                $token = $request->header('Authorization');
+                if (!$token || !$this->authProvider->validateToken($token)) {
+                    throw new AuthenticationException('Invalid or missing token');
+                }
+            }
 
-        // Handle regular request
-        $message = $this->parseMessage($request);
-        $response = $this->processMessage($message);
-        
-        return response()->json($response);
+            $data = $request->json()->all();
+            $type = $data['type'] ?? 'text';
+            $content = $data['content'] ?? '';
+            $role = $data['role'] ?? 'user';
+
+            $message = new Message(
+                content: $content,
+                role: Role::from($role),
+                type: MessageType::from($type)
+            );
+
+            if (isset($this->handlers[$type])) {
+                $response = $this->handlers[$type]($message);
+                return new Response(
+                    json_encode($response),
+                    200,
+                    ['Content-Type' => 'application/json']
+                );
+            }
+
+            return new Response(
+                json_encode(['error' => 'No handler found for message type']),
+                404,
+                ['Content-Type' => 'application/json']
+            );
+        } catch (AuthenticationException $e) {
+            return new Response(
+                json_encode(['error' => $e->getMessage()]),
+                401,
+                ['Content-Type' => 'application/json']
+            );
+        } catch (\Exception $e) {
+            return new Response(
+                json_encode(['error' => $e->getMessage()]),
+                500,
+                ['Content-Type' => 'application/json']
+            );
+        }
     }
 
     /**
@@ -218,5 +261,15 @@ class MCPServer
                 unset($this->sessions[$sessionId]);
             }
         }
+    }
+
+    public function on(string $type, callable $handler): void
+    {
+        $this->handlers[$type] = $handler;
+    }
+
+    public function use(callable $middleware): void
+    {
+        $this->middleware[] = $middleware;
     }
 } 

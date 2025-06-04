@@ -2,143 +2,115 @@
 
 namespace Ronydebnath\MCP\Client;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
-use Ronydebnath\MCP\Exceptions\ConnectionException;
-use Ronydebnath\MCP\Types\Message;
-use Symfony\Component\EventDispatcher\EventDispatcher;
-use Symfony\Component\HttpClient\Chunk\ServerSentEvent;
-use Symfony\Component\HttpClient\EventSourceHttpClient;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Component\HttpClient\HttpClient;
+use Ronydebnath\MCP\Types\Message;
+use Ronydebnath\MCP\Exceptions\ConnectionException;
 
 class StreamingMCPClient
 {
-    private EventSourceHttpClient $httpClient;
-    private string $baseUrl;
-    private ?string $sessionId = null;
-    private EventDispatcher $dispatcher;
-    private array $config;
-    private EventSourceHttpClient $eventSourceClient;
+    protected HttpClientInterface $httpClient;
+    protected string $baseUrl;
+    protected ?string $sessionId = null;
+    protected $onMessageCallback = null;
+    protected $onErrorCallback = null;
 
-    public function __construct(array $config = [])
+    public function __construct(string $baseUrl, ?HttpClientInterface $httpClient = null)
     {
-        $this->config = $config;
-        $this->baseUrl = $config['base_url'] ?? 'http://localhost:8000';
-        $this->httpClient = HttpClient::create();
-        $this->eventSourceClient = new EventSourceHttpClient($this->httpClient);
-        $this->dispatcher = new EventDispatcher();
+        $this->baseUrl = $baseUrl;
+        $this->httpClient = $httpClient ?? HttpClient::create();
     }
 
-    /**
-     * Send a message and stream the response
-     *
-     * @param Message $message
-     * @param callable $onMessage Callback for each message chunk
-     * @param callable|null $onError Callback for errors
-     * @return void
-     * @throws ConnectionException
-     */
-    public function stream(Message $message, callable $onMessage, ?callable $onError = null): void
+    public function onMessage(callable $callback): void
+    {
+        $this->onMessageCallback = $callback;
+    }
+
+    public function onError(callable $callback): void
+    {
+        $this->onErrorCallback = $callback;
+    }
+
+    public function streamMessage(Message $message): void
     {
         try {
-            $headers = [
-                'Accept' => 'text/event-stream',
-                'Content-Type' => 'application/json',
-            ];
-
-            if ($this->sessionId) {
-                $headers['MCP-Session-ID'] = $this->sessionId;
-            }
-
-            $response = $this->httpClient->request('POST', '/messages/stream', [
-                'headers' => $headers,
-                'json' => $message->toArray(),
+            $response = $this->httpClient->request('POST', $this->baseUrl . '/messages/stream', [
+                'json' => [
+                    'role' => $message->role->value,
+                    'content' => $message->content,
+                    'type' => $message->type->value
+                ],
+                'headers' => [
+                    'Accept' => 'text/event-stream'
+                ]
             ]);
 
+            $this->sessionId = $response->getHeaders()['MCP-Session-ID'][0] ?? null;
+
             foreach ($this->httpClient->stream($response) as $chunk) {
-                if ($chunk instanceof ServerSentEvent) {
-                    if ($chunk->getData() === 'message') {
-                        $data = json_decode($chunk->getData(), true);
-                        $onMessage($data);
+                if ($chunk->isTimeout() || $chunk->isFirst() || $chunk->isLast()) {
+                    continue;
+                }
+                $data = $chunk->getContent();
+                if ($this->onMessageCallback && $data) {
+                    $decoded = json_decode($data, true);
+                    if ($decoded) {
+                        ($this->onMessageCallback)($decoded);
                     }
                 }
             }
-        } catch (GuzzleException $e) {
-            if ($onError) {
-                $onError($e);
+        } catch (\Exception $e) {
+            if ($this->onErrorCallback) {
+                ($this->onErrorCallback)($e);
+            } else {
+                throw new ConnectionException('Failed to stream message: ' . $e->getMessage(), 0, $e);
             }
-            throw new ConnectionException(
-                "Failed to stream message to MCP server: {$e->getMessage()}",
-                $e->getCode(),
-                $e
-            );
         }
     }
 
-    /**
-     * Send multiple messages and stream the response
-     *
-     * @param array<Message> $messages
-     * @param callable $onMessage Callback for each message chunk
-     * @param callable|null $onError Callback for errors
-     * @return void
-     * @throws ConnectionException
-     */
-    public function streamMultiple(array $messages, callable $onMessage, ?callable $onError = null): void
+    public function streamMessages(array $messages): void
     {
         try {
-            $headers = [
-                'Accept' => 'text/event-stream',
-                'Content-Type' => 'application/json',
-            ];
-
-            if ($this->sessionId) {
-                $headers['MCP-Session-ID'] = $this->sessionId;
-            }
-
-            $response = $this->httpClient->request('POST', '/messages/batch/stream', [
-                'headers' => $headers,
-                'json' => array_map(fn (Message $message) => $message->toArray(), $messages),
+            $response = $this->httpClient->request('POST', $this->baseUrl . '/messages/stream/batch', [
+                'json' => array_map(function (Message $message) {
+                    return [
+                        'role' => $message->role->value,
+                        'content' => $message->content,
+                        'type' => $message->type->value
+                    ];
+                }, $messages),
+                'headers' => [
+                    'Accept' => 'text/event-stream'
+                ]
             ]);
 
+            $this->sessionId = $response->getHeaders()['MCP-Session-ID'][0] ?? null;
+
             foreach ($this->httpClient->stream($response) as $chunk) {
-                if ($chunk instanceof ServerSentEvent) {
-                    if ($chunk->getData() === 'message') {
-                        $data = json_decode($chunk->getData(), true);
-                        $onMessage($data);
+                if ($chunk->isTimeout() || $chunk->isFirst() || $chunk->isLast()) {
+                    continue;
+                }
+                $data = $chunk->getContent();
+                if ($this->onMessageCallback && $data) {
+                    $decoded = json_decode($data, true);
+                    if ($decoded) {
+                        ($this->onMessageCallback)($decoded);
                     }
                 }
             }
-        } catch (GuzzleException $e) {
-            if ($onError) {
-                $onError($e);
+        } catch (\Exception $e) {
+            if ($this->onErrorCallback) {
+                ($this->onErrorCallback)($e);
+            } else {
+                throw new ConnectionException('Failed to stream messages: ' . $e->getMessage(), 0, $e);
             }
-            throw new ConnectionException(
-                "Failed to stream messages to MCP server: {$e->getMessage()}",
-                $e->getCode(),
-                $e
-            );
         }
     }
 
-    /**
-     * Get the current session ID
-     *
-     * @return string|null
-     */
     public function getSessionId(): ?string
     {
         return $this->sessionId;
-    }
-
-    /**
-     * Set the session ID
-     *
-     * @param string $sessionId
-     * @return void
-     */
-    public function setSessionId(string $sessionId): void
-    {
-        $this->sessionId = $sessionId;
     }
 } 

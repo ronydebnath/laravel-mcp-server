@@ -2,15 +2,17 @@
 
 namespace Ronydebnath\MCP\Tests\Server;
 
-use Illuminate\Http\Request;
 use PHPUnit\Framework\TestCase;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Ronydebnath\MCP\Server\MCPServer;
 use Ronydebnath\MCP\Types\Message;
 use Ronydebnath\MCP\Types\Role;
+use Ronydebnath\MCP\Types\MessageType;
 
 class MCPServerTest extends TestCase
 {
-    private MCPServer $server;
+    protected MCPServer $server;
 
     protected function setUp(): void
     {
@@ -18,98 +20,50 @@ class MCPServerTest extends TestCase
         $this->server = new MCPServer();
     }
 
-    public function test_can_handle_regular_request(): void
+    public function test_can_handle_regular_request()
     {
-        $request = $this->createRequest([
-            'role' => Role::USER->value,
+        $request = Request::create('/messages', 'POST', [], [], [], [], json_encode([
             'content' => 'Hello',
-            'type' => 'text',
-        ]);
+            'role' => 'user',
+            'type' => 'text'
+        ]));
 
-        $this->server->registerHandler('text', function (Message $message) {
-            return [
-                'role' => Role::ASSISTANT->value,
-                'content' => 'Hi there!',
-                'type' => 'text',
-            ];
+        $this->server->on('text', function (Message $message) {
+            return ['response' => 'Received: ' . $message->content];
         });
 
         $response = $this->server->handle($request);
-        $data = json_decode($response->getContent(), true);
-
-        $this->assertEquals(Role::ASSISTANT->value, $data['role']);
-        $this->assertEquals('Hi there!', $data['content']);
-        $this->assertEquals('text', $data['type']);
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals(['response' => 'Received: Hello'], json_decode($response->getContent(), true));
     }
 
-    public function test_can_handle_streaming_request(): void
+    public function test_handles_missing_handler()
     {
-        $request = $this->createRequest([
-            'role' => Role::USER->value,
+        $request = Request::create('/messages', 'POST', [], [], [], [], json_encode([
             'content' => 'Hello',
-            'type' => 'text',
-        ], true);
+            'role' => 'user',
+            'type' => 'unknown'
+        ]));
 
-        $this->server->registerHandler('text', function (Message $message) {
-            return [
-                'role' => Role::ASSISTANT->value,
-                'content' => 'Hi there!',
-                'type' => 'text',
-            ];
+        $response = $this->server->handle($request);
+        $this->assertEquals(404, $response->getStatusCode());
+        $this->assertEquals(['error' => 'No handler found for message type'], json_decode($response->getContent(), true));
+    }
+
+    public function test_middleware_can_intercept_request()
+    {
+        $request = Request::create('/messages', 'POST', [], [], [], [], json_encode([
+            'content' => 'Hello',
+            'role' => 'user',
+            'type' => 'text'
+        ]));
+
+        $this->server->use(function ($request) {
+            return response()->json(['error' => 'Middleware intercepted'], 403);
         });
 
         $response = $this->server->handle($request);
-
-        $this->assertEquals('text/event-stream', $response->headers->get('Content-Type'));
-        $this->assertNotNull($response->headers->get('MCP-Session-ID'));
-    }
-
-    public function test_handles_missing_handler(): void
-    {
-        $request = $this->createRequest([
-            'role' => Role::USER->value,
-            'content' => 'Hello',
-            'type' => 'unknown',
-        ]);
-
-        $response = $this->server->handle($request);
-        $data = json_decode($response->getContent(), true);
-
-        $this->assertEquals(Role::ASSISTANT->value, $data['role']);
-        $this->assertStringContainsString('No handler registered', $data['content']);
-    }
-
-    public function test_middleware_can_intercept_request(): void
-    {
-        $request = $this->createRequest([
-            'role' => Role::USER->value,
-            'content' => 'Hello',
-            'type' => 'text',
-        ]);
-
-        $this->server->registerMiddleware(function ($request) {
-            return response()->json([
-                'role' => Role::ASSISTANT->value,
-                'content' => 'Intercepted!',
-                'type' => 'text',
-            ]);
-        });
-
-        $response = $this->server->handle($request);
-        $data = json_decode($response->getContent(), true);
-
-        $this->assertEquals(Role::ASSISTANT->value, $data['role']);
-        $this->assertEquals('Intercepted!', $data['content']);
-    }
-
-    private function createRequest(array $data, bool $streaming = false): Request
-    {
-        $request = Request::create('/mcp', 'POST', [], [], [], [], json_encode($data));
-        
-        if ($streaming) {
-            $request->headers->set('Accept', 'text/event-stream');
-        }
-
-        return $request;
+        $this->assertEquals(403, $response->getStatusCode());
+        $this->assertEquals(['error' => 'Middleware intercepted'], json_decode($response->getContent(), true));
     }
 } 
