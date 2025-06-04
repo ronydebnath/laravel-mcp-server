@@ -1,0 +1,71 @@
+# Laravel & PHP
+/vendor/
+/node_modules/
+/.env
+/.env.*
+.phpunit.result.cache
+.phpunit.cache
+.phpunit-watcher.cache
+Homestead.json
+Homestead.yaml
+/.vagrant/
+/.idea/
+/.phpunit/
+/.php_cs.cache
+/.DS_Store
+/public/storage
+/storage/*.key
+/storage/app/public
+/storage/debugbar
+/storage/logs
+/storage/framework/cache/data
+/storage/framework/sessions
+/storage/framework/testing
+/storage/framework/views
+/storage/logs
+/coverage/
+composer.lock
+npm-debug.log
+yarn-error.log
+.env.backup
+.env.example
+.env.testing
+.env.local
+.env.development
+.env.production
+/.psalm/
+/psalm.xml
+/psalm.xml.dist
+
+# Composer Related
+composer.lock
+/vendor
+
+# Frontend Assets
+/node_modules
+
+# Logs
+npm-debug.log
+yarn-error.log
+
+# Caches
+.phpunit.cache
+.phpunit.result.cache
+/build
+
+# IDE Helper
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+
+# Editors
+/.idea
+/.fleet
+/.vscode
+
+# Misc
+phpunit.xml
+phpstan.neon
+testbench.yaml
+/docs
+/coverage
