@@ -1,3 +1,5 @@
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/ronydebnath/mcp-sdk.svg)](https://packagist.org/packages/ronydebnath/mcp-sdk)
+
 # MCP SDK for Laravel
 
 A Laravel package for interacting with Model Context Protocol (MCP) servers and implementing MCP servers.
