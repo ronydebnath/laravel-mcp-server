@@ -64,12 +64,15 @@ class Memory
     /**
      * Get messages by type
      *
-     * @param string $type
+     * @param string|\Ronydebnath\MCP\Types\MessageType $type
      * @return array
      */
-    public function getByType(string $type): array
+    public function getByType($type): array
     {
-        return array_filter($this->messages, fn($message) => $message->type === $type);
+        if ($type instanceof \Ronydebnath\MCP\Types\MessageType) {
+            $type = $type->value;
+        }
+        return array_filter($this->messages, fn($message) => $message->type->value === $type);
     }
 
     /**

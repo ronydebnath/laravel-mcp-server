@@ -7,6 +7,7 @@ use Ronydebnath\MCP\Shared\Context;
 use Ronydebnath\MCP\Shared\Memory;
 use Ronydebnath\MCP\Types\Message;
 use Ronydebnath\MCP\Types\Role;
+use Ronydebnath\MCP\Types\MessageType;
 
 class ContextTest extends TestCase
 {
@@ -84,7 +85,7 @@ class ContextTest extends TestCase
         $message = new Message(
             role: Role::USER,
             content: 'Hello',
-            type: 'text'
+            type: MessageType::TEXT
         );
         
         $this->context->addMessage($message);
@@ -99,7 +100,7 @@ class ContextTest extends TestCase
         $message = new Message(
             role: Role::USER,
             content: 'Hello',
-            type: 'text'
+            type: MessageType::TEXT
         );
         
         $this->context->addMessage($message);
@@ -116,7 +117,7 @@ class ContextTest extends TestCase
         $message = new Message(
             role: Role::USER,
             content: 'Hello',
-            type: 'text'
+            type: MessageType::TEXT
         );
         $this->context->addMessage($message);
         

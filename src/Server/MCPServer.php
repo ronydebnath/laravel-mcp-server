@@ -7,6 +7,7 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Str;
 use Ronydebnath\MCP\Types\Message;
 use Ronydebnath\MCP\Types\Role;
+use Ronydebnath\MCP\Types\MessageType;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MCPServer
@@ -91,7 +92,7 @@ class MCPServer
             $this->sendSSE('message', [
                 'role' => Role::ASSISTANT->value,
                 'content' => 'Connected to MCP server',
-                'type' => 'text',
+                'type' => MessageType::TEXT,
             ]);
 
             // Process message and stream response
@@ -117,7 +118,7 @@ class MCPServer
         return new Message(
             role: Role::from($data['role']),
             content: $data['content'],
-            type: $data['type'] ?? 'text'
+            type: $data['type'] ?? MessageType::TEXT
         );
     }
 
@@ -135,7 +136,7 @@ class MCPServer
             return [
                 'role' => Role::ASSISTANT->value,
                 'content' => 'No handler registered for message type: ' . $message->type,
-                'type' => 'text',
+                'type' => MessageType::TEXT,
             ];
         }
 
@@ -163,7 +164,7 @@ class MCPServer
             $this->sendSSE('message', [
                 'role' => Role::ASSISTANT->value,
                 'content' => 'No handler registered for message type: ' . $message->type,
-                'type' => 'text',
+                'type' => MessageType::TEXT,
             ]);
             return;
         }

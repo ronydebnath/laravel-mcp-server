@@ -6,6 +6,7 @@ use PHPUnit\Framework\TestCase;
 use Ronydebnath\MCP\Shared\Memory;
 use Ronydebnath\MCP\Types\Message;
 use Ronydebnath\MCP\Types\Role;
+use Ronydebnath\MCP\Types\MessageType;
 
 class MemoryTest extends TestCase
 {
@@ -22,7 +23,7 @@ class MemoryTest extends TestCase
         $message = new Message(
             role: Role::USER,
             content: 'Hello',
-            type: 'text'
+            type: MessageType::TEXT
         );
 
         $this->memory->add($message);
@@ -32,8 +33,8 @@ class MemoryTest extends TestCase
     public function test_can_add_multiple_messages(): void
     {
         $messages = [
-            new Message(role: Role::USER, content: 'First', type: 'text'),
-            new Message(role: Role::ASSISTANT, content: 'Second', type: 'text'),
+            new Message(role: Role::USER, content: 'First', type: MessageType::TEXT),
+            new Message(role: Role::ASSISTANT, content: 'Second', type: MessageType::TEXT),
         ];
 
         $this->memory->addMultiple($messages);
@@ -43,10 +44,10 @@ class MemoryTest extends TestCase
     public function test_respects_max_size(): void
     {
         $messages = [
-            new Message(role: Role::USER, content: 'First', type: 'text'),
-            new Message(role: Role::USER, content: 'Second', type: 'text'),
-            new Message(role: Role::USER, content: 'Third', type: 'text'),
-            new Message(role: Role::USER, content: 'Fourth', type: 'text'),
+            new Message(role: Role::USER, content: 'First', type: MessageType::TEXT),
+            new Message(role: Role::USER, content: 'Second', type: MessageType::TEXT),
+            new Message(role: Role::USER, content: 'Third', type: MessageType::TEXT),
+            new Message(role: Role::USER, content: 'Fourth', type: MessageType::TEXT),
         ];
 
         $this->memory->addMultiple($messages);
@@ -57,9 +58,9 @@ class MemoryTest extends TestCase
     public function test_can_get_messages_by_role(): void
     {
         $messages = [
-            new Message(role: Role::USER, content: 'User message', type: 'text'),
-            new Message(role: Role::ASSISTANT, content: 'Assistant message', type: 'text'),
-            new Message(role: Role::USER, content: 'Another user message', type: 'text'),
+            new Message(role: Role::USER, content: 'User message', type: MessageType::TEXT),
+            new Message(role: Role::ASSISTANT, content: 'Assistant message', type: MessageType::TEXT),
+            new Message(role: Role::USER, content: 'Another user message', type: MessageType::TEXT),
         ];
 
         $this->memory->addMultiple($messages);
@@ -71,13 +72,13 @@ class MemoryTest extends TestCase
     public function test_can_get_messages_by_type(): void
     {
         $messages = [
-            new Message(role: Role::USER, content: 'Text message', type: 'text'),
-            new Message(role: Role::USER, content: 'Image message', type: 'image'),
-            new Message(role: Role::USER, content: 'Another text message', type: 'text'),
+            new Message(role: Role::USER, content: 'Text message', type: MessageType::TEXT),
+            new Message(role: Role::USER, content: 'Image message', type: MessageType::IMAGE),
+            new Message(role: Role::USER, content: 'Another text message', type: MessageType::TEXT),
         ];
 
         $this->memory->addMultiple($messages);
-        $textMessages = $this->memory->getByType('text');
+        $textMessages = $this->memory->getByType(MessageType::TEXT);
         $this->assertCount(2, $textMessages);
         $this->assertEquals('Text message', $textMessages[0]->content);
     }
@@ -85,8 +86,8 @@ class MemoryTest extends TestCase
     public function test_can_clear_messages(): void
     {
         $messages = [
-            new Message(role: Role::USER, content: 'First', type: 'text'),
-            new Message(role: Role::USER, content: 'Second', type: 'text'),
+            new Message(role: Role::USER, content: 'First', type: MessageType::TEXT),
+            new Message(role: Role::USER, content: 'Second', type: MessageType::TEXT),
         ];
 
         $this->memory->addMultiple($messages);
@@ -100,7 +101,7 @@ class MemoryTest extends TestCase
     {
         $this->assertEquals(0, $this->memory->size());
         
-        $this->memory->add(new Message(role: Role::USER, content: 'Test', type: 'text'));
+        $this->memory->add(new Message(role: Role::USER, content: 'Test', type: MessageType::TEXT));
         $this->assertEquals(1, $this->memory->size());
     }
 
@@ -108,7 +109,7 @@ class MemoryTest extends TestCase
     {
         $this->assertTrue($this->memory->isEmpty());
         
-        $this->memory->add(new Message(role: Role::USER, content: 'Test', type: 'text'));
+        $this->memory->add(new Message(role: Role::USER, content: 'Test', type: MessageType::TEXT));
         $this->assertFalse($this->memory->isEmpty());
     }
 
@@ -117,9 +118,9 @@ class MemoryTest extends TestCase
         $this->assertFalse($this->memory->isFull());
         
         $messages = [
-            new Message(role: Role::USER, content: 'First', type: 'text'),
-            new Message(role: Role::USER, content: 'Second', type: 'text'),
-            new Message(role: Role::USER, content: 'Third', type: 'text'),
+            new Message(role: Role::USER, content: 'First', type: MessageType::TEXT),
+            new Message(role: Role::USER, content: 'Second', type: MessageType::TEXT),
+            new Message(role: Role::USER, content: 'Third', type: MessageType::TEXT),
         ];
 
         $this->memory->addMultiple($messages);

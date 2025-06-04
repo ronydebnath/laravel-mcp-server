@@ -9,6 +9,7 @@ use Ronydebnath\MCP\Types\Message;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\Chunk\ServerSentEvent;
 use Symfony\Component\HttpClient\EventSourceHttpClient;
+use Symfony\Component\HttpClient\HttpClient;
 
 class StreamingMCPClient
 {
@@ -16,21 +17,16 @@ class StreamingMCPClient
     private string $baseUrl;
     private ?string $sessionId = null;
     private EventDispatcher $dispatcher;
+    private array $config;
+    private EventSourceHttpClient $eventSourceClient;
 
-    public function __construct(array $config)
+    public function __construct(array $config = [])
     {
-        $this->baseUrl = sprintf(
-            'http://%s:%d',
-            $config['host'] ?? 'localhost',
-            $config['port'] ?? 8000
-        );
-
+        $this->config = $config;
+        $this->baseUrl = $config['base_url'] ?? 'http://localhost:8000';
+        $this->httpClient = HttpClient::create();
+        $this->eventSourceClient = new EventSourceHttpClient($this->httpClient);
         $this->dispatcher = new EventDispatcher();
-        $this->httpClient = new EventSourceHttpClient([
-            'base_uri' => $this->baseUrl,
-            'timeout' => $config['timeout'] ?? 30,
-            'connect_timeout' => $config['timeout'] ?? 30,
-        ]);
     }
 
     /**
@@ -61,7 +57,7 @@ class StreamingMCPClient
 
             foreach ($this->httpClient->stream($response) as $chunk) {
                 if ($chunk instanceof ServerSentEvent) {
-                    if ($chunk->getEvent() === 'message') {
+                    if ($chunk->getData() === 'message') {
                         $data = json_decode($chunk->getData(), true);
                         $onMessage($data);
                     }
@@ -107,7 +103,7 @@ class StreamingMCPClient
 
             foreach ($this->httpClient->stream($response) as $chunk) {
                 if ($chunk instanceof ServerSentEvent) {
-                    if ($chunk->getEvent() === 'message') {
+                    if ($chunk->getData() === 'message') {
                         $data = json_decode($chunk->getData(), true);
                         $onMessage($data);
                     }
