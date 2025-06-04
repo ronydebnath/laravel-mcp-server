@@ -64,6 +64,6 @@ class MCPServiceProvider extends ServiceProvider
     {
         $this->publishes([
             __DIR__.'/../config/mcp.php' => config_path('mcp.php'),
-        ], 'mcp-config');
+        ], 'config');
     }
 } 
